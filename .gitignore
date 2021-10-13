@@ -4,3 +4,4 @@ secrets.go
 .vscode/*
 Release/*
 *.zip
+icon/*

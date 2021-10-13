@@ -1,3 +1,4 @@
+//go:generate goversioninfo -icon=EyeofZomm.ico
 package main
 
 import (
@@ -113,7 +114,7 @@ func main() {
 }
 
 func onReady() {
-	pIcon, err := ioutil.ReadFile("Everquest.ico")
+	pIcon, err := ioutil.ReadFile("EyeofZomm.ico")
 	if err != nil {
 		log.Fatal(err)
 	}
