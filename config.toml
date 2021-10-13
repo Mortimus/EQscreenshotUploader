@@ -1,0 +1,26 @@
+
+[Discord]
+
+  # Discord Channel to sent screenshots to leave blanke to use built in server
+  ChannelID = ""
+
+  # Discord Bot Token leave blank to use built in server
+  Token = ""
+
+[Everquest]
+
+  # Path to screenshot folder leave blank to auto detect
+  ScreenshotPath = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Everquest F2P\\Screenshots"
+
+[Log]
+
+  # Where to store logs leave blank to use EQscreenshotUploader.log
+  Path = "EQscreenshotUploader.log"
+
+[Main]
+
+  # Extension for screenshots defaults to .jpg
+  ScreenshotExtension = ".jpg"
+
+  # Time to wait (in seconds) to upload the screenshot. We have to delay until it's finished writing and released for reading defaults to 5 seconds
+  UploadDelay = 5

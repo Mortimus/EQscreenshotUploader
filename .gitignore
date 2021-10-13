@@ -1,0 +1,6 @@
+secrets.go
+*.exe
+*.log
+.vscode/*
+Release/*
+*.zip
