@@ -15,7 +15,16 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/fsnotify/fsnotify"
 	"github.com/getlantern/systray"
+	"golang.org/x/sys/windows/registry"
 )
+
+const autoRunReg = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+const registyKey = "EQScreenshotUploader"
+
+var startupOn *systray.MenuItem
+var startupOff *systray.MenuItem
+var sConfig *systray.MenuItem
+var sLog *systray.MenuItem
 
 func main() {
 	file, err := os.OpenFile(configuration.Log.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -41,6 +50,9 @@ func main() {
 	// done := make(chan bool)
 	go func() {
 		for {
+			if sConfig == nil || sLog == nil || startupOn == nil || startupOff == nil {
+				continue
+			}
 			select {
 			case event, ok := <-watcher.Events:
 				if !ok {
@@ -57,6 +69,37 @@ func main() {
 					return
 				}
 				log.Println("error:", err)
+			case <-sConfig.ClickedCh:
+				log.Printf("Editing config at %s\n", configPath)
+				cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", configPath)
+				cmd.Start()
+			case <-sLog.ClickedCh:
+				ex, err := os.Executable()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				exPath := filepath.Dir(ex)
+				log.Printf("Opening log at %s\n", filepath.Join(exPath, configuration.Log.Path))
+				cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", filepath.Join(exPath, configuration.Log.Path))
+				cmd.Start()
+			case <-startupOn.ClickedCh:
+				ex, err := os.Executable()
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				log.Printf("Setting autostart to %s\n", ex)
+				err = installAutoRun(ex, registyKey)
+				if err != nil {
+					log.Println(err)
+				}
+			case <-startupOff.ClickedCh:
+				log.Printf("Removing autostart\n")
+				err := removeAutoRun(registyKey)
+				if err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}()
@@ -78,33 +121,11 @@ func onReady() {
 	systray.SetTitle("EQscreenshotUploader")
 	systray.SetTooltip("Everquest Screenshot Monitor")
 	if runtime.GOOS == "windows" {
-		mConfig := systray.AddMenuItem("Configuration", "Open configuration for editing")
-		go func() { // Todo: we need to move this as it can only be ran once here
-			<-mConfig.ClickedCh
-			ex, err := os.Executable()
-			if err != nil {
-				panic(err)
-			}
-			exPath := filepath.Dir(ex)
-			log.Printf("Editing config at %s\n", filepath.Join(exPath, configPath))
-			cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", filepath.Join(exPath, configPath))
-			cmd.Start()
-		}()
-		mLog := systray.AddMenuItem("Open Log", "View Log")
-		go func() { // Todo: we need to move this as it can only be ran once here
-			<-mLog.ClickedCh
-			ex, err := os.Executable()
-			if err != nil {
-				panic(err)
-			}
-			exPath := filepath.Dir(ex)
-			log.Printf("Opening log at %s\n", filepath.Join(exPath, configuration.Log.Path))
-			cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", filepath.Join(exPath, configuration.Log.Path))
-			cmd.Start()
-		}()
+		sConfig = systray.AddMenuItem("Configuration", "Open configuration for editing")
+		sLog = systray.AddMenuItem("Open Log", "View Log")
 		startup := systray.AddMenuItem("Autostart", "Launch EQscreenshotUploader when Windows starts")
-		startup.AddSubMenuItem("On", "Automatically launch with Windows")
-		startup.AddSubMenuItem("Off", "Disable launching with Windows")
+		startupOn = startup.AddSubMenuItem("On", "Automatically launch with Windows")
+		startupOff = startup.AddSubMenuItem("Off", "Disable launching with Windows")
 	}
 	mQuit := systray.AddMenuItem("Exit", "Stop monitoring screenshots")
 	go func() {
@@ -213,6 +234,33 @@ func (s *screenShots) LoadExisting(ext string) error {
 		if filepath.Ext(file.Name()) == ext {
 			s.add(filepath.Join(s.Folder, file.Name()))
 		}
+	}
+	return nil
+}
+
+func installAutoRun(location string, key string) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER, autoRunReg, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	if err := k.SetStringValue(key, location); err != nil {
+		return err
+	}
+	if err := k.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func removeAutoRun(key string) error {
+	k, err := registry.OpenKey(registry.CURRENT_USER, autoRunReg, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer k.Close()
+	err = k.DeleteValue(key)
+	if err != nil {
+		return err
 	}
 	return nil
 }
