@@ -27,7 +27,10 @@ func init() {
 	if err != nil {
 		configuration, err = loadConfig(configPath)
 		if err != nil {
-			panic(err)
+			err = ioutil.WriteFile(configPath, nil, 0644)
+			if err != nil {
+				log.Printf("Error writing config: %s", err.Error())
+			}
 		}
 	} else {
 		configPath = filepath.Join(exPath, configPath)
