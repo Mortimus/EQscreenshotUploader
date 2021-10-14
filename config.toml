@@ -1,7 +1,7 @@
 
 [Discord]
 
-  # Discord Channel to sent screenshots to leave blanke to use built in server
+  # Discord Channel to sent screenshots to leave blank to use built in server
   ChannelID = ""
 
   # Discord Bot Token leave blank to use built in server
@@ -18,6 +18,24 @@
   Path = "EQscreenshotUploader.log"
 
 [Main]
+
+  # Amount of blur to apply to partial screenshots. Defaults to 6.5
+  BlurAmount = 6.5
+
+  # Blur partial screenshots. Defaults to false
+  BlurPartial = true
+
+  # X end coordinate of box to blur
+  BlurXEnd = 2559
+
+  # X start coordinate of box to blur
+  BlurXStart = 0
+
+  # y end coordinate of box to blur
+  BlurYEnd = 1398
+
+  # y start coordinate of box to blur
+  BlurYStart = 1042
 
   # Extension for screenshots defaults to .jpg
   ScreenshotExtension = ".jpg"

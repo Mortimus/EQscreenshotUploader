@@ -40,13 +40,19 @@ func init() {
 }
 
 type Main struct {
-	UploadDelay         int    `comment:"Time to wait (in seconds) to upload the screenshot. We have to delay until it's finished writing and released for reading defaults to 5 seconds"`
-	ScreenshotExtension string `comment:"Extension for screenshots defaults to .jpg"`
+	UploadDelay         int     `comment:"Time to wait (in seconds) to upload the screenshot. We have to delay until it's finished writing and released for reading defaults to 5 seconds"`
+	ScreenshotExtension string  `comment:"Extension for screenshots defaults to .jpg"`
+	BlurPartial         bool    `comment:"Blur partial screenshots. Defaults to false"`
+	BlurAmount          float64 `comment:"Amount of blur to apply to partial screenshots. Defaults to 6.5"`
+	BlurXStart          int     `comment:"X start coordinate of box to blur"`
+	BlurYStart          int     `comment:"y start coordinate of box to blur"`
+	BlurXEnd            int     `comment:"X end coordinate of box to blur"`
+	BlurYEnd            int     `comment:"y end coordinate of box to blur"`
 }
 
 type Discord struct {
 	Token     string `comment:"Discord Bot Token leave blank to use built in server"`
-	ChannelID string `comment:"Discord Channel to sent screenshots to leave blanke to use built in server"`
+	ChannelID string `comment:"Discord Channel to sent screenshots to leave blank to use built in server"`
 }
 
 type Everquest struct {
@@ -89,6 +95,9 @@ func loadDefaults() {
 	}
 	if configuration.Log.Path == "" {
 		configuration.Log.Path = "EQscreenshotUploader.log"
+	}
+	if configuration.Main.BlurAmount == 0 {
+		configuration.Main.BlurAmount = 6.5
 	}
 }
 

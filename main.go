@@ -2,7 +2,10 @@
 package main
 
 import (
+	"bytes"
 	"errors"
+	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,7 +16,10 @@ import (
 	"sync"
 	"time"
 
+	_ "embed"
+
 	"github.com/bwmarrin/discordgo"
+	"github.com/disintegration/imaging"
 	"github.com/fsnotify/fsnotify"
 	"github.com/getlantern/systray"
 	"golang.org/x/sys/windows/registry"
@@ -26,6 +32,10 @@ var startupOn *systray.MenuItem
 var startupOff *systray.MenuItem
 var sConfig *systray.MenuItem
 var sLog *systray.MenuItem
+var sSFolder *systray.MenuItem
+
+//go:embed EyeofZomm.ico
+var iconData []byte
 
 func main() {
 	file, err := os.OpenFile(configuration.Log.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -51,7 +61,7 @@ func main() {
 	// done := make(chan bool)
 	go func() {
 		for {
-			if sConfig == nil || sLog == nil || startupOn == nil || startupOff == nil {
+			if sConfig == nil || sLog == nil || startupOn == nil || startupOff == nil || sSFolder == nil {
 				continue
 			}
 			select {
@@ -84,6 +94,10 @@ func main() {
 				log.Printf("Opening log at %s\n", filepath.Join(exPath, configuration.Log.Path))
 				cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", filepath.Join(exPath, configuration.Log.Path))
 				cmd.Start()
+			case <-sSFolder.ClickedCh:
+				log.Printf("Opening screenshot folder at %s\n", configuration.Everquest.ScreenshotPath)
+				cmd := exec.Command("rundll32.exe", "url.dll,FileProtocolHandler", configuration.Everquest.ScreenshotPath)
+				cmd.Start()
 			case <-startupOn.ClickedCh:
 				ex, err := os.Executable()
 				if err != nil {
@@ -114,16 +128,13 @@ func main() {
 }
 
 func onReady() {
-	pIcon, err := ioutil.ReadFile("EyeofZomm.ico")
-	if err != nil {
-		log.Fatal(err)
-	}
-	systray.SetIcon(pIcon)
+	systray.SetIcon(iconData)
 	systray.SetTitle("EQscreenshotUploader")
 	systray.SetTooltip("Everquest Screenshot Monitor")
 	if runtime.GOOS == "windows" {
 		sConfig = systray.AddMenuItem("Configuration", "Open configuration for editing")
 		sLog = systray.AddMenuItem("Open Log", "View Log")
+		sSFolder = systray.AddMenuItem("Screenshots", "Open screenshots folder")
 		startup := systray.AddMenuItem("Autostart", "Launch EQscreenshotUploader when Windows starts")
 		startupOn = startup.AddSubMenuItem("On", "Automatically launch with Windows")
 		startupOff = startup.AddSubMenuItem("Off", "Disable launching with Windows")
@@ -171,6 +182,13 @@ func findPath() string {
 		return steamPath
 	}
 	// check other path
+	// E:\Users\Public\Daybreak Game Company\Installed Games\EverQuest\Screenshots
+	const daybreakPath = `C:\Users\Public\Daybreak Game Company\Installed Games\EverQuest\Screenshots`
+	log.Printf("Looking for everquest screenshots at %s\n", daybreakPath)
+	if _, err := os.Stat(steamPath); !os.IsNotExist(err) {
+		log.Printf("Using screenshot folder %s\n", daybreakPath)
+		return steamPath
+	}
 
 	// Path not found
 	return ""
@@ -219,7 +237,30 @@ func (s *screenShots) Upload(path string, ext string, discord *discordgo.Session
 			return err
 		}
 		defer file.Close()
-		discord.ChannelFileSend(getDiscordChannel(), filepath.Base(path), file)
+		if configuration.Main.BlurPartial {
+			log.Printf("Bluring %s\n", path)
+			img, _, err := image.Decode(file)
+			if err != nil {
+				return err
+			}
+			toBlur := img.(interface {
+				SubImage(r image.Rectangle) image.Image
+			}).SubImage(image.Rect(configuration.Main.BlurXStart, configuration.Main.BlurYStart, configuration.Main.BlurXEnd, configuration.Main.BlurYEnd))
+			dstImage := imaging.Blur(toBlur, configuration.Main.BlurAmount)
+			complete := imaging.Paste(img, dstImage, image.Pt(configuration.Main.BlurXStart, configuration.Main.BlurYStart))
+			buf := new(bytes.Buffer)
+			log.Printf("oBounds: %+v\nbBounds: %+v\ntBounds: %+v\n", img.Bounds(), dstImage.Bounds(), toBlur.Bounds())
+			err = jpeg.Encode(buf, complete, nil)
+			if err != nil {
+				return err
+			}
+			imgBytes := buf.Bytes()
+			reader := bytes.NewReader(imgBytes)
+
+			discord.ChannelFileSend(getDiscordChannel(), filepath.Base(path), reader)
+		} else {
+			discord.ChannelFileSend(getDiscordChannel(), filepath.Base(path), file)
+		}
 		return nil
 	}
 	return errors.New("ignoring " + path)
